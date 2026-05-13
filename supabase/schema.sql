@@ -66,7 +66,6 @@ as $$
     d.user_id,
     d.file_name,
     d.content_text,
-    d.metadata,
     1 - (d.embedding <=> query_embedding) as similarity
   from public.documents d
   where
