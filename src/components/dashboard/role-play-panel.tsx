@@ -17,7 +17,7 @@ const ROLEPLAY_CASES = [
 ] as const;
 
 export function RolePlayPanel() {
-  const [scenario, setScenario] = useState(
+  const [scenario, setScenario] = useState<string>(
     ROLEPLAY_CASES[0],
   );
   const [message, setMessage] = useState("");

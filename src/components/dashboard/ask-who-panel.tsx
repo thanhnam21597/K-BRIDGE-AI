@@ -95,7 +95,7 @@ export function AskWhoPanel({
                     <Badge variant="outline">Step {index + 1}</Badge>
                     <p className="text-sm font-semibold text-slate-800">{target.role}</p>
                   </div>
-                  <Badge variant="secondary">{target.expectedResponseWindow}</Badge>
+                  <Badge variant="accent">{target.expectedResponseWindow}</Badge>
                 </div>
                 <p className="mt-2 text-xs text-slate-600">{target.why}</p>
                 <div className="mt-2 rounded-lg border border-slate-100 bg-slate-50 p-2 text-xs text-slate-700">
