@@ -2,10 +2,14 @@
 
 import type { ComponentType } from "react";
 import {
+  AlertCircle,
+  BarChart3,
   Bot,
+  BookOpenCheck,
+  CalendarRange,
+  Rocket,
   Languages,
   MessageSquareQuote,
-  Sparkles,
   ClipboardCheck,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -26,10 +30,14 @@ const NAV_ITEMS: {
   label: string;
   icon: ComponentType<{ className?: string }>;
 }[] = [
+  { key: "demo-flow", label: "Demo Flow (3m)", icon: Rocket },
   { key: "cultural-coach", label: "Cultural Coach", icon: Bot },
+  { key: "onboarding-kpi", label: "Onboarding KPI", icon: BarChart3 },
   { key: "translator", label: "Real-time Translator", icon: Languages },
   { key: "role-play", label: "Role-play Simulator", icon: MessageSquareQuote },
-  { key: "daily-tips", label: "Daily Tips", icon: Sparkles },
+  { key: "flashcards", label: "Flash Cards", icon: BookOpenCheck },
+  { key: "weekly-timeline", label: "Weekly Timeline", icon: CalendarRange },
+  { key: "ask-who", label: "Ask Who / Escalation", icon: AlertCircle },
 ];
 
 export function Sidebar({ user, activeFeature, onSelectFeature }: SidebarProps) {

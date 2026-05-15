@@ -74,13 +74,15 @@ export async function translateBusinessText(
   toLang: string,
 ) {
   const model = getModel();
+  const translationInstruction =
+    fromLang === "auto"
+      ? `Detect source language automatically, then translate to ${toLang}. Keep business meaning exact.`
+      : `Translate from ${fromLang} to ${toLang}. Keep business meaning exact.`;
   const response = await model.invoke([
     new SystemMessage(
       "You are a professional business translator. Keep tone formal and clear.",
     ),
-    new HumanMessage(
-      `Translate from ${fromLang} to ${toLang}. Keep business meaning exact.\n\n${text}`,
-    ),
+    new HumanMessage(`${translationInstruction}\n\n${text}`),
   ]);
 
   return response.content.toString();
@@ -96,4 +98,30 @@ export async function runRolePlay(scenario: string, userMessage: string) {
   ]);
 
   return response.content.toString();
+}
+
+export async function autoCorrectTranscript(
+  transcript: string,
+  language: "vi-VN" | "en-US",
+) {
+  const model = getModel();
+  const response = await model.invoke([
+    new SystemMessage(
+      [
+        "You are a transcript correction assistant for speech-to-text.",
+        "Correct obvious recognition mistakes while preserving original intent.",
+        "Do not add new facts or change meaning.",
+        "Keep output concise and return corrected plain text only.",
+      ].join(" "),
+    ),
+    new HumanMessage(
+      [
+        `Language context: ${language}`,
+        "Correct this transcript:",
+        transcript,
+      ].join("\n"),
+    ),
+  ]);
+
+  return response.content.toString().trim();
 }

@@ -177,6 +177,34 @@ export const KOREAN_VIETNAMESE_WORKPLACE_KB: KoreanVietnameseKbEntry[] = [
     content:
       "Keep a shared VN-EN-KR glossary for key business terms such as risk, blocker, owner, deadline, and escalation. This reduces ambiguity in bilingual and trilingual projects.",
   },
+  {
+    id: "kb-21",
+    title: "Sample company policy: meeting windows and response SLA",
+    tags: ["meeting-etiquette", "work-hours", "remote-collaboration"],
+    content:
+      "Mock policy for remote Korean team: core meeting windows are 09:30-11:30 KST and 14:00-17:00 KST; async messages should be acknowledged within 2 business hours; urgent production issues must be escalated immediately via Slack #urgent plus direct ping to on-duty lead.",
+  },
+  {
+    id: "kb-22",
+    title: "Sample reporting format for daily and weekly status",
+    tags: ["reporting-delay", "meeting-etiquette", "communication-style"],
+    content:
+      "Recommended report template: 1) Yesterday done, 2) Today plan, 3) Blockers, 4) Needed support, 5) ETA impact. For delay reports, include root cause, affected scope, mitigation option A/B, and requested decision owner.",
+  },
+  {
+    id: "kb-23",
+    title: "Internal email template: asking for help politely",
+    tags: ["addressing-seniors", "communication-style", "glossary"],
+    content:
+      "Template: Subject: [Support Needed][Ticket-123] Clarification on API scope. Body: Greeting + concise context + what you already tried + specific question + expected timeline + appreciation. This style is polite, efficient, and easy for Korean seniors to respond to.",
+  },
+  {
+    id: "kb-24",
+    title: "Escalation chain guideline for onboarding period",
+    tags: ["hierarchy", "reporting-delay", "relationship-building"],
+    content:
+      "Escalation guideline: first ask Buddy for quick context, then Tech Lead for technical decision, then Manager for priority trade-offs, and HR for policy or people-risk issues. Include evidence, impact, and proposed next step in each escalation message.",
+  },
 ];
 
 const TAG_KEYWORDS: Record<KoreanVietnameseKbTag, string[]> = {
@@ -190,9 +218,9 @@ const TAG_KEYWORDS: Record<KoreanVietnameseKbTag, string[]> = {
   "remote-collaboration": ["remote", "tu xa", "async", "status update", "handoff"],
   "virtual-team-building": ["team building", "coffee chat", "bonding", "van hoa doi nhom"],
   misunderstanding: ["misunderstanding", "hieu nham", "conflict", "xung dot"],
-  "reporting-delay": ["delay", "tre tien do", "report", "bao cao", "escalation"],
+  "reporting-delay": ["delay", "tre tien do", "report", "bao cao", "escalation", "blocker", "eta"],
   "relationship-building": ["relationship", "jeong", "trust", "tin cay"],
-  glossary: ["glossary", "thuat ngu", "vn en kr", "translate term"],
+  glossary: ["glossary", "thuat ngu", "vn en kr", "translate term", "template", "email", "policy"],
 };
 
 export function selectKbEntriesForQuery(query: string, limit = 8) {

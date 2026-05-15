@@ -1,0 +1,59 @@
+import { NextResponse } from "next/server";
+import { z } from "zod";
+import { getSupabaseServerClient } from "@/lib/supabase";
+import { checkRateLimit, createRateLimitKey } from "@/lib/rate-limit";
+import { logApiError } from "@/lib/server-log";
+
+const requestSchema = z.object({
+  userId: z.string().min(1),
+  messageId: z.string().min(1),
+  rating: z.enum(["up", "down"]),
+  reason: z.string().max(400).optional(),
+  userMessage: z.string().max(3000).optional(),
+  assistantMessage: z.string().min(1).max(8000),
+});
+
+export async function POST(request: Request) {
+  try {
+    const limiter = checkRateLimit(createRateLimitKey(request, "agent-feedback-post"), 50, 60_000);
+    if (!limiter.ok) {
+      return NextResponse.json(
+        { error: "Too many feedback requests. Please retry shortly." },
+        { status: 429 },
+      );
+    }
+
+    const body = await request.json();
+    const input = requestSchema.parse(body);
+    const supabase = getSupabaseServerClient();
+
+    const { error } = await supabase.from("coach_feedback").upsert(
+      {
+        user_id: input.userId,
+        message_id: input.messageId,
+        rating: input.rating,
+        reason: input.reason ?? null,
+        user_message: input.userMessage ?? null,
+        assistant_message: input.assistantMessage,
+        metadata: { source: "coach-chat-feedback" },
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id,message_id" },
+    );
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    logApiError("api/agent/feedback:POST", error);
+    return NextResponse.json(
+      {
+        error: "Unable to save coach feedback",
+        detail: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 400 },
+    );
+  }
+}

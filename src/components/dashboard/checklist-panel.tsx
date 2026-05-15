@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, Circle } from "lucide-react";
+import { CheckCircle2, Circle, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -37,6 +37,89 @@ const CATEGORY_OPTIONS: ChecklistCategory[] = [
   "Cultural Adaptation",
   "Technical Setup",
   "Relationship Building",
+];
+
+const POSITION_OPTIONS = [
+  "Software Engineer",
+  "Frontend Engineer",
+  "Backend Engineer",
+  "Full-stack Engineer",
+  "Mobile Engineer",
+  "QA Engineer",
+  "DevOps Engineer",
+  "Data Engineer",
+  "Data Analyst",
+  "Data Scientist",
+  "AI Engineer",
+  "ML Engineer",
+  "Product Manager",
+  "Project Manager",
+  "Business Analyst",
+  "UI/UX Designer",
+  "Graphic Designer",
+  "Marketing Specialist",
+  "Digital Marketing Specialist",
+  "Content Creator",
+  "Sales Executive",
+  "Customer Success Specialist",
+  "HR Specialist",
+  "Recruiter",
+  "Finance Analyst",
+  "Accountant",
+  "Operations Specialist",
+  "Procurement Specialist",
+  "Supply Chain Coordinator",
+  "Administrative Assistant",
+  "Executive Assistant",
+  "Technical Support Specialist",
+  "IT Helpdesk",
+  "Security Analyst",
+  "Legal Specialist",
+  "Interpreter/Translator",
+  "Teacher/Trainer",
+  "Researcher",
+  "Other",
+] as const;
+
+const COMPANY_OPTIONS = [
+  "Samsung",
+  "Kakao",
+  "LG",
+  "Hyundai",
+  "Naver",
+  "Coupang",
+  "SK Hynix",
+  "SK Telecom",
+  "KT Corporation",
+  "POSCO",
+  "Lotte",
+  "CJ Group",
+  "Hanwha",
+  "Doosan",
+  "Kia",
+  "Hyundai Mobis",
+  "Shinsegae",
+  "Nexon",
+  "NCSoft",
+  "Pearl Abyss",
+  "Krafton",
+  "Line Plus",
+  "Woowa Brothers (Baemin)",
+  "Yanolja",
+  "Toss (Viva Republica)",
+  "Kurly",
+  "Musinsa",
+  "Daangn",
+  "Sendbird",
+  "Moloco",
+  "Other",
+] as const;
+
+const CULTURAL_TIPS_FOR_EXPORT = [
+  "Use concise updates: progress, blocker, next action.",
+  "When reporting delays, include cause, impact, and mitigation plan.",
+  "Confirm decisions in writing after meetings to avoid cross-language ambiguity.",
+  "Respect hierarchy while still asking clear and proactive questions.",
 ];
 
 function buildStorageKey(userId: string) {
@@ -193,6 +276,69 @@ export function ChecklistPanel({ userId }: ChecklistPanelProps) {
     }
   }
 
+  async function exportChecklistAsPdf() {
+    if (tasks.length === 0) return;
+
+    const { jsPDF } = await import("jspdf");
+    const pdf = new jsPDF({ unit: "pt", format: "a4" });
+
+    const marginX = 40;
+    const maxWidth = 515;
+    let y = 48;
+
+    const addWrappedLine = (text: string, size = 10, gap = 16) => {
+      pdf.setFontSize(size);
+      const lines = pdf.splitTextToSize(text, maxWidth);
+      lines.forEach((line: string) => {
+        if (y > 780) {
+          pdf.addPage();
+          y = 48;
+        }
+        pdf.text(line, marginX, y);
+        y += gap;
+      });
+    };
+
+    const completedTasks = tasks.filter((task) => completed.includes(task.id));
+    const today = new Date().toLocaleDateString("en-CA");
+
+    pdf.setFontSize(16);
+    pdf.setFont("helvetica", "bold");
+    pdf.text("K-Bridge AI - Checklist Report", marginX, y);
+    y += 24;
+
+    pdf.setFont("helvetica", "normal");
+    addWrappedLine(`Position: ${position}`);
+    addWrappedLine(`Company: ${company}`);
+    addWrappedLine(`Start date: ${startDate}`);
+    addWrappedLine(`Export date: ${today}`);
+    addWrappedLine(
+      `Progress: ${progress}% (${completedTasks.length}/${tasks.length} tasks completed)`,
+    );
+    y += 8;
+
+    pdf.setFont("helvetica", "bold");
+    addWrappedLine("Completed Tasks", 12, 18);
+    pdf.setFont("helvetica", "normal");
+    if (completedTasks.length === 0) {
+      addWrappedLine("- No completed tasks yet.");
+    } else {
+      completedTasks.forEach((task) => {
+        addWrappedLine(
+          `- Day ${task.day} | ${task.category} | ${task.title}: ${task.description}`,
+        );
+      });
+    }
+
+    y += 8;
+    pdf.setFont("helvetica", "bold");
+    addWrappedLine("Cultural Tips", 12, 18);
+    pdf.setFont("helvetica", "normal");
+    CULTURAL_TIPS_FOR_EXPORT.forEach((tip) => addWrappedLine(`- ${tip}`));
+
+    pdf.save(`kbridge-checklist-${today}.pdf`);
+  }
+
   const progress = useMemo(() => {
     if (tasks.length === 0) return 0;
     return Math.round((completed.length / tasks.length) * 100);
@@ -206,24 +352,40 @@ export function ChecklistPanel({ userId }: ChecklistPanelProps) {
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
-          <Input
-            value={position}
-            onChange={(event) => {
-              const value = event.target.value;
-              setPosition(value);
-              persistState({ position: value });
-            }}
-            placeholder="Position (e.g. Software Engineer)"
-          />
-          <Input
-            value={company}
-            onChange={(event) => {
-              const value = event.target.value;
-              setCompany(value);
-              persistState({ company: value });
-            }}
-            placeholder="Company (e.g. Samsung, Kakao)"
-          />
+          <div className="space-y-1">
+            <Input
+              list="position-options"
+              value={position}
+              onChange={(event) => {
+                const value = event.target.value;
+                setPosition(value);
+                persistState({ position: value });
+              }}
+              placeholder="Select or type position"
+            />
+            <datalist id="position-options">
+              {POSITION_OPTIONS.map((job) => (
+                <option key={job} value={job} />
+              ))}
+            </datalist>
+          </div>
+          <div className="space-y-1">
+            <Input
+              list="company-options"
+              value={company}
+              onChange={(event) => {
+                const value = event.target.value;
+                setCompany(value);
+                persistState({ company: value });
+              }}
+              placeholder="Select or type company"
+            />
+            <datalist id="company-options">
+              {COMPANY_OPTIONS.map((companyName) => (
+                <option key={companyName} value={companyName} />
+              ))}
+            </datalist>
+          </div>
           <Input
             type="date"
             value={startDate}
@@ -233,16 +395,17 @@ export function ChecklistPanel({ userId }: ChecklistPanelProps) {
               persistState({ startDate: value });
             }}
           />
-          <Button onClick={generateChecklist} disabled={loadingChecklist}>
+          <Button className="w-full" onClick={generateChecklist} disabled={loadingChecklist}>
             {loadingChecklist ? "Generating checklist..." : "Generate Personalized Checklist"}
           </Button>
-          <div className="flex items-center gap-2">
+
+          <div className="grid grid-cols-1 gap-2">
             <select
               value={selectedCategory}
               onChange={(event) =>
                 setSelectedCategory(event.target.value as ChecklistCategory)
               }
-              className="h-10 flex-1 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700"
+              className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700"
             >
               {CATEGORY_OPTIONS.map((category) => (
                 <option key={category} value={category}>
@@ -254,6 +417,7 @@ export function ChecklistPanel({ userId }: ChecklistPanelProps) {
               variant="secondary"
               onClick={regenerateCategory}
               disabled={regeneratingCategory || tasks.length === 0}
+              className="w-full whitespace-nowrap text-sm"
             >
               {regeneratingCategory ? "Regenerating..." : "Regenerate Category"}
             </Button>
@@ -266,6 +430,15 @@ export function ChecklistPanel({ userId }: ChecklistPanelProps) {
             <span>{progress}%</span>
           </div>
           <Progress value={progress} />
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={exportChecklistAsPdf}
+            disabled={tasks.length === 0}
+          >
+            <Download className="size-4" />
+            Export Checklist as PDF
+          </Button>
         </div>
 
         {celebrationMessage && (

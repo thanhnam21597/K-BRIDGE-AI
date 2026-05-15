@@ -1,5 +1,5 @@
-import { KBridgeDashboard } from "@/components/dashboard/kbridge-dashboard";
+import { HomeLanding } from "@/components/landing/home-landing";
 
 export default function Home() {
-  return <KBridgeDashboard />;
+  return <HomeLanding />;
 }

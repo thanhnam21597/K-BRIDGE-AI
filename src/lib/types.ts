@@ -1,8 +1,12 @@
 export type FeatureKey =
+  | "demo-flow"
   | "cultural-coach"
+  | "onboarding-kpi"
   | "translator"
   | "role-play"
-  | "daily-tips";
+  | "flashcards"
+  | "ask-who"
+  | "weekly-timeline";
 
 export type LanguageCode = "vi" | "en" | "ko";
 
@@ -50,4 +54,34 @@ export type DynamicChecklistTask = {
   title: string;
   description: string;
   category: ChecklistCategory;
+};
+
+export type FlashcardCategory =
+  | "Hierarchy & Respect"
+  | "Communication Style"
+  | "Meeting & Email Etiquette"
+  | "Feedback Culture"
+  | "Common Korean Business Terms"
+  | "Virtual Team Building";
+
+export type FlashcardDifficulty = "easy" | "medium" | "hard";
+
+export type Flashcard = {
+  id: string;
+  front: string;
+  back: string;
+  category: FlashcardCategory;
+  tags: string[];
+  difficulty: FlashcardDifficulty;
+};
+
+export type FlashcardProgress = {
+  userId: string;
+  cardId: string;
+  reviewCount: number;
+  easyCount: number;
+  hardCount: number;
+  forgotCount: number;
+  masteryScore: number;
+  lastReviewedAt: string | null;
 };

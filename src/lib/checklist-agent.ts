@@ -78,13 +78,18 @@ export async function generatePersonalizedChecklist({
     ]);
 
     const parsed = checklistSchema.parse(JSON.parse(response.content.toString()));
-    return parsed.tasks.map((task) => ({
+    const normalizedTasks = parsed.tasks.map((task) => ({
       id: `day-${task.day}-${slugify(task.title)}`,
       ...task,
     }));
+    return enforceWeeklyCheckpointTasks(normalizedTasks, position, company);
   } catch {
     // Safe fallback keeps feature usable even if model key is missing.
-    return buildFallbackChecklist(position, company);
+    return enforceWeeklyCheckpointTasks(
+      buildFallbackChecklist(position, company),
+      position,
+      company,
+    );
   }
 }
 
@@ -167,22 +172,28 @@ export async function regenerateChecklistCategory({
     return normalizedDays.map((day) => {
       const task = byDay.get(day);
       if (!task) {
-        return {
+        const fallbackTask: DynamicChecklistTask = {
           id: `day-${day}-${slugify(`${category}-${position}`)}`,
           day,
           category,
           title: `${category} task for day ${day}`,
           description: `Prepare one concrete ${category.toLowerCase()} deliverable for your ${position} role at ${company}.`,
         };
+        return isWeeklyCheckpointDay(day)
+          ? buildWeeklyCheckpointTask(day, position, company, category)
+          : fallbackTask;
       }
 
-      return {
+      const generatedTask: DynamicChecklistTask = {
         id: `day-${day}-${slugify(task.title)}`,
         day,
         category,
         title: task.title,
         description: task.description,
       };
+      return isWeeklyCheckpointDay(day)
+        ? buildWeeklyCheckpointTask(day, position, company, category)
+        : generatedTask;
     });
   } catch {
     return normalizedDays.map((day) => ({
@@ -215,6 +226,39 @@ function buildFallbackChecklist(position: string, company: string): DynamicCheck
       description: `Complete a ${category.toLowerCase()} milestone for your ${position} role at ${company}, including one concrete output to share with your manager.`,
     };
   });
+}
+
+function isWeeklyCheckpointDay(day: number) {
+  return day === 7 || day === 14 || day === 21 || day === 28;
+}
+
+function buildWeeklyCheckpointTask(
+  day: number,
+  position: string,
+  company: string,
+  category: DynamicChecklistTask["category"],
+): DynamicChecklistTask {
+  const week = Math.ceil(day / 7);
+  const title = `Weekly checkpoint quiz - Week ${week}`;
+  return {
+    id: `day-${day}-${slugify(title)}`,
+    day,
+    category,
+    title,
+    description: `Take a 15-minute self-test on your Week ${week} onboarding progress for ${position} at ${company}: culture understanding, communication quality, and next-week action plan.`,
+  };
+}
+
+function enforceWeeklyCheckpointTasks(
+  tasks: DynamicChecklistTask[],
+  position: string,
+  company: string,
+) {
+  return tasks.map((task) =>
+    isWeeklyCheckpointDay(task.day)
+      ? buildWeeklyCheckpointTask(task.day, position, company, task.category)
+      : task,
+  );
 }
 
 function slugify(value: string) {

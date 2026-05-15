@@ -28,6 +28,7 @@ const textSplitter = new RecursiveCharacterTextSplitter({
 });
 
 type ChatRole = "user" | "assistant";
+export type ResponseLanguage = "vi" | "en";
 let globalKbSeedCheckPromise: Promise<void> | null = null;
 
 export type ConversationTurn = {
@@ -199,7 +200,29 @@ async function saveConversationTurn(userId: string, userMessage: string, assista
   if (error) throw new Error(`Failed to save conversation: ${error.message}`);
 }
 
-export async function chatWithKBridgeAgent(userId: string, message: string) {
+function buildLanguageInstruction(responseLanguage: ResponseLanguage) {
+  if (responseLanguage === "en") {
+    return [
+      "Language override for this turn (highest priority): English.",
+      "If any previous instruction conflicts with language choice, follow this override.",
+      "Respond fully in natural professional English.",
+      "Do not add Vietnamese translation unless user explicitly asks for bilingual output.",
+    ].join(" ");
+  }
+
+  return [
+    "Language override for this turn (highest priority): Vietnamese.",
+    "If any previous instruction conflicts with language choice, follow this override.",
+    "Respond fully in natural Vietnamese.",
+    "Do not add English translation unless user explicitly asks for bilingual output.",
+  ].join(" ");
+}
+
+export async function chatWithKBridgeAgent(
+  userId: string,
+  message: string,
+  responseLanguage: ResponseLanguage = "vi",
+) {
   // Fire startup verification once per server process.
   void checkGlobalKbSeedStatusOnce();
 
@@ -216,6 +239,7 @@ export async function chatWithKBridgeAgent(userId: string, message: string) {
   const model = getChatModel();
   const response = await model.invoke([
     new SystemMessage(KBRIDGE_SYSTEM_PROMPT),
+    new SystemMessage(buildLanguageInstruction(responseLanguage)),
     new SystemMessage(
       [
         "Use the following retrieved context from JD/company docs and onboarding knowledge.",
