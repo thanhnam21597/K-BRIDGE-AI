@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getDefaultFlashcards } from "@/lib/flashcards";
-import { getSupabaseServerClient } from "@/lib/supabase";
+import {
+  fetchFlashcardProgressByCardIds,
+  fetchFlashcardProgressOne,
+  mapFlashcardProgressRow,
+  upsertFlashcardProgress,
+} from "@/lib/db-store";
 import { FlashcardProgress } from "@/lib/types";
 
 const reviewSchema = z.object({
@@ -10,39 +15,6 @@ const reviewSchema = z.object({
   category: z.string().min(1),
   rating: z.enum(["easy", "hard", "forgot"]),
 });
-
-function mapProgressRow(row: {
-  user_id: string;
-  card_id: string;
-  review_count: number;
-  easy_count: number;
-  hard_count: number;
-  forgot_count: number;
-  mastery_score: number;
-  last_reviewed_at: string | null;
-}): FlashcardProgress {
-  return {
-    userId: row.user_id,
-    cardId: row.card_id,
-    reviewCount: row.review_count,
-    easyCount: row.easy_count,
-    hardCount: row.hard_count,
-    forgotCount: row.forgot_count,
-    masteryScore: row.mastery_score,
-    lastReviewedAt: row.last_reviewed_at,
-  };
-}
-
-type ProgressRow = {
-  user_id: string;
-  card_id: string;
-  review_count: number;
-  easy_count: number;
-  hard_count: number;
-  forgot_count: number;
-  mastery_score: number;
-  last_reviewed_at: string | null;
-};
 
 export async function GET(request: Request) {
   try {
@@ -63,19 +35,10 @@ export async function GET(request: Request) {
       return NextResponse.json({ cards: [], mode, total: 0 });
     }
 
-    const supabase = getSupabaseServerClient();
     const cardIds = categoryCards.map((card) => card.id);
-    const { data, error } = await supabase
-      .from("flashcard_progress")
-      .select(
-        "user_id,card_id,review_count,easy_count,hard_count,forgot_count,mastery_score,last_reviewed_at",
-      )
-      .eq("user_id", userId)
-      .in("card_id", cardIds);
-
-    const progressRows: ProgressRow[] = error ? [] : ((data ?? []) as ProgressRow[]);
+    const progressRows = await fetchFlashcardProgressByCardIds(userId, cardIds);
     const progressById = new Map(
-      progressRows.map((row) => [row.card_id, mapProgressRow(row)]),
+      progressRows.map((row) => [row.card_id, mapFlashcardProgressRow(row)]),
     );
 
     const cards = categoryCards.map((card) => ({
@@ -118,22 +81,7 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const parsed = reviewSchema.parse(body);
-    const supabase = getSupabaseServerClient();
-
-    const { data: existingRows, error: existingError } = await supabase
-      .from("flashcard_progress")
-      .select(
-        "user_id,card_id,review_count,easy_count,hard_count,forgot_count,mastery_score,last_reviewed_at",
-      )
-      .eq("user_id", parsed.userId)
-      .eq("card_id", parsed.cardId)
-      .limit(1);
-
-    if (existingError) {
-      throw new Error(existingError.message);
-    }
-
-    const existing = existingRows?.[0];
+    const existing = await fetchFlashcardProgressOne(parsed.userId, parsed.cardId);
     const reviewCount = (existing?.review_count ?? 0) + 1;
     const easyCount = (existing?.easy_count ?? 0) + (parsed.rating === "easy" ? 1 : 0);
     const hardCount = (existing?.hard_count ?? 0) + (parsed.rating === "hard" ? 1 : 0);
@@ -155,11 +103,7 @@ export async function POST(request: Request) {
       last_reviewed_at: new Date().toISOString(),
     };
 
-    const { error } = await supabase
-      .from("flashcard_progress")
-      .upsert(row, { onConflict: "user_id,card_id" });
-
-    if (error) throw new Error(error.message);
+    await upsertFlashcardProgress(row);
 
     return NextResponse.json({ success: true, progress: row });
   } catch (error) {

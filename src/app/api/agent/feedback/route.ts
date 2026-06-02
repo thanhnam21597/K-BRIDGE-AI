@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getSupabaseServerClient } from "@/lib/supabase";
+import { upsertCoachFeedback } from "@/lib/db-store";
 import { checkRateLimit, createRateLimitKey } from "@/lib/rate-limit";
 import { logApiError } from "@/lib/server-log";
 
@@ -25,25 +25,14 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const input = requestSchema.parse(body);
-    const supabase = getSupabaseServerClient();
-
-    const { error } = await supabase.from("coach_feedback").upsert(
-      {
-        user_id: input.userId,
-        message_id: input.messageId,
-        rating: input.rating,
-        reason: input.reason ?? null,
-        user_message: input.userMessage ?? null,
-        assistant_message: input.assistantMessage,
-        metadata: { source: "coach-chat-feedback" },
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "user_id,message_id" },
-    );
-
-    if (error) {
-      throw new Error(error.message);
-    }
+    await upsertCoachFeedback({
+      userId: input.userId,
+      messageId: input.messageId,
+      rating: input.rating,
+      reason: input.reason,
+      userMessage: input.userMessage,
+      assistantMessage: input.assistantMessage,
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {

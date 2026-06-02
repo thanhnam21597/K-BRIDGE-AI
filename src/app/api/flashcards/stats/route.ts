@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSupabaseServerClient } from "@/lib/supabase";
+import { fetchFlashcardStatsRows } from "@/lib/db-store";
 
 export async function GET(request: Request) {
   try {
@@ -9,17 +9,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Missing userId" }, { status: 400 });
     }
 
-    const supabase = getSupabaseServerClient();
-    const { data, error } = await supabase
-      .from("flashcard_progress")
-      .select("category,mastery_score,last_reviewed_at")
-      .eq("user_id", userId);
-
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    const rows = data ?? [];
+    const rows = await fetchFlashcardStatsRows(userId);
     const today = new Date().toISOString().slice(0, 10);
     const reviewedToday = rows.filter((row) => row.last_reviewed_at?.slice(0, 10) === today).length;
     const averageMastery =

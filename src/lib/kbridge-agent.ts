@@ -3,8 +3,15 @@ import { ChatAnthropic } from "@langchain/anthropic";
 import { ChatGroq } from "@langchain/groq";
 import { ChatOpenAI, OpenAIEmbeddings } from "@langchain/openai";
 import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
+import {
+  deleteConversationHistory,
+  countDocumentsBySource,
+  fetchConversationHistory,
+  insertConversationTurn,
+  insertDocumentRows,
+  matchDocumentsScoped,
+} from "@/lib/db-store";
 import { GLOBAL_KB_USER_ID, KB_SOURCE } from "@/lib/seed-kb";
-import { getSupabaseServerClient } from "@/lib/supabase";
 
 const KBRIDGE_SYSTEM_PROMPT = `You are K-Bridge AI, a friendly, patient, and culturally intelligent onboarding buddy for Vietnamese people working remotely at Korean companies.
 
@@ -85,15 +92,7 @@ function getEmbeddingModel() {
 }
 
 export async function loadUserConversationHistory(userId: string) {
-  const supabase = getSupabaseServerClient();
-  const { data, error } = await supabase
-    .from("conversations")
-    .select("messages,created_at")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: true });
-
-  if (error) throw new Error(`Failed to load conversation history: ${error.message}`);
-  if (!data) return [];
+  const data = await fetchConversationHistory(userId);
 
   return data.flatMap((row) => {
     const messages = Array.isArray(row.messages) ? row.messages : [];
@@ -106,13 +105,7 @@ export async function loadUserConversationHistory(userId: string) {
 }
 
 export async function clearUserConversationHistory(userId: string) {
-  const supabase = getSupabaseServerClient();
-  const { error } = await supabase
-    .from("conversations")
-    .delete()
-    .eq("user_id", userId);
-
-  if (error) throw new Error(`Failed to clear conversation history: ${error.message}`);
+  await deleteConversationHistory(userId);
 }
 
 function checkGlobalKbSeedStatusOnce() {
@@ -120,26 +113,14 @@ function checkGlobalKbSeedStatusOnce() {
 
   globalKbSeedCheckPromise = (async () => {
     try {
-      const supabase = getSupabaseServerClient();
-      const { count, error } = await supabase
-        .from("documents")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", GLOBAL_KB_USER_ID)
-        .contains("metadata", { source: KB_SOURCE });
+      const count = await countDocumentsBySource(GLOBAL_KB_USER_ID, KB_SOURCE);
 
-      if (error) {
-        console.warn(
-          `[K-Bridge AI] Startup check could not verify global KB seed status: ${error.message}`,
-        );
-        return;
-      }
-
-      if (!count || count === 0) {
+      if (count === 0) {
         console.warn(
           [
             "[K-Bridge AI] Global knowledge base has not been seeded yet.",
             "Chat can still run but initial cultural context may be weaker.",
-            "Run: POST /api/admin/seed-kb to seed KB into Supabase documents.",
+            "Run: POST /api/admin/seed-kb to seed KB into Neon documents.",
           ].join(" "),
         );
       }
@@ -156,25 +137,12 @@ function checkGlobalKbSeedStatusOnce() {
 async function retrieveRelevantContext(userId: string, query: string) {
   const embeddings = getEmbeddingModel();
   const queryEmbedding = await embeddings.embedQuery(query);
-  const supabase = getSupabaseServerClient();
-
-  const { data, error } = await supabase.rpc("match_documents_scoped", {
-    query_embedding: queryEmbedding,
-    match_count: 5,
-    filter_user_ids: [userId, GLOBAL_KB_USER_ID],
-    source_filter: null,
-  });
-
-  if (error) {
-    throw new Error(`Failed to retrieve RAG context: ${error.message}`);
-  }
-
-  const retrieved = (data ?? []) as Array<{
-    file_name: string;
-    content_text: string;
-    metadata?: { source?: string; tags?: string[]; category?: string };
-    similarity: number;
-  }>;
+  const retrieved = await matchDocumentsScoped(
+    queryEmbedding,
+    5,
+    [userId, GLOBAL_KB_USER_ID],
+    null,
+  );
 
   const dynamicContext = retrieved
     .map(
@@ -183,21 +151,15 @@ async function retrieveRelevantContext(userId: string, query: string) {
     )
     .join("\n\n");
 
-  // Unified pipeline: all retrieval context comes from Supabase vector table.
+  // Unified pipeline: all retrieval context comes from Postgres vector table.
   return dynamicContext || "No relevant vector documents found yet.";
 }
 
 async function saveConversationTurn(userId: string, userMessage: string, assistantReply: string) {
-  const supabase = getSupabaseServerClient();
-  const { error } = await supabase.from("conversations").insert({
-    user_id: userId,
-    messages: [
-      { role: "user", content: userMessage },
-      { role: "assistant", content: assistantReply },
-    ],
-  });
-
-  if (error) throw new Error(`Failed to save conversation: ${error.message}`);
+  await insertConversationTurn(userId, [
+    { role: "user", content: userMessage },
+    { role: "assistant", content: assistantReply },
+  ]);
 }
 
 function buildLanguageInstruction(responseLanguage: ResponseLanguage) {
@@ -258,7 +220,6 @@ export async function chatWithKBridgeAgent(
 }
 
 export async function uploadUserDocuments(userId: string, files: File[]) {
-  const supabase = getSupabaseServerClient();
   const embeddingModel = getEmbeddingModel();
   let uploadedChunks = 0;
 
@@ -283,8 +244,7 @@ export async function uploadUserDocuments(userId: string, files: File[]) {
       embedding: vectors[index],
     }));
 
-    const { error } = await supabase.from("documents").insert(rows);
-    if (error) throw new Error(`Failed to save document embeddings: ${error.message}`);
+    await insertDocumentRows(rows);
     uploadedChunks += rows.length;
   }
 

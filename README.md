@@ -8,7 +8,7 @@ Remote Onboarding Assistant for Vietnamese employees joining Korean companies.
 - Tailwind CSS + shadcn/ui-style components
 - Next.js API routes for backend
 - LangChain + Groq / Claude 3.5 Sonnet (fallback OpenAI)
-- Supabase (persistent conversation + pgvector RAG)
+- Neon PostgreSQL (persistent conversation + pgvector RAG)
 - Local storage-based demo state (auth/profile placeholder)
 - Deployment-ready for Vercel
 
@@ -77,7 +77,8 @@ src/
     seed-kb.ts
     llm.ts
     onboarding.ts
-    supabase.ts
+    db.ts
+    db-store.ts
     flashcards.ts
     types.ts
     utils.ts
@@ -94,12 +95,10 @@ Copy `.env.example` to `.env.local` and set at least one provider key:
 - `ANTHROPIC_API_KEY` (Claude 3.5 Sonnet preferred)
 - `GROQ_API_KEY` (fast inference option)
 - `OPENAI_API_KEY` (chat + embeddings for RAG)
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `DATABASE_URL` (Neon PostgreSQL connection string)
 
 Optional:
 
-- `SUPABASE_SERVICE_ROLE_KEY` (recommended for server-side write operations)
 - `SEED_API_KEY` (protect KB seed endpoint)
 - `VALSEA_API_KEY` (optional STT provider key)
 - `VALSEA_BASE_URL` (optional STT provider base URL)
@@ -107,7 +106,7 @@ Optional:
 Security notes:
 
 - Never commit `.env.local` or real API keys to git.
-- Keep `SUPABASE_SERVICE_ROLE_KEY` server-side only (do not expose with `NEXT_PUBLIC_`).
+- Keep `DATABASE_URL` server-side only (do not expose with `NEXT_PUBLIC_`).
 - Rotate keys if they were pasted in chats/screenshots.
 
 ## Run Locally
@@ -119,15 +118,21 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
-## Supabase Setup
+## Neon Setup
 
-1. Create a Supabase project.
-2. Run SQL in `supabase/schema.sql` to create `conversations`, `documents`, `flashcard_progress`, `coach_feedback`, and `match_documents_scoped`.
-3. Add Supabase env variables to `.env.local`.
+1. Create a free project at [https://console.neon.tech](https://console.neon.tech).
+2. Open **SQL Editor** and run:
+
+```sql
+CREATE EXTENSION IF NOT EXISTS vector;
+```
+
+3. Run the rest of SQL in `supabase/schema.sql` to create `conversations`, `documents`, `flashcard_progress`, `coach_feedback`, and `match_documents_scoped`.
+4. Copy **Connection string** from Neon Dashboard and set `DATABASE_URL` in `.env.local`.
 
 ### Seed Global KB
 
-Seed the built-in Korean-Vietnamese KB into Supabase vector table:
+Seed the built-in Korean-Vietnamese KB into Postgres vector table:
 
 ```bash
 curl -X POST http://localhost:3000/api/admin/seed-kb
@@ -157,7 +162,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\seed-kb.ps1 -BaseUrl "http://
 - `POST /api/agent/transcribe` with `multipart/form-data` `{ audio, language }` for server-side STT
 - `POST /api/agent/voice-correct` with `{ transcript, language }` auto-corrects speech transcript via LLM
 - `POST /api/agent/upload` as `multipart/form-data` with `userId` + one or more `files`
-- `POST /api/admin/seed-kb` seeds backup KB into Supabase documents
+- `POST /api/admin/seed-kb` seeds backup KB into Postgres documents
 - `GET /api/admin/kb-status` returns seeded/not-seeded status for global KB
 - `GET /api/flashcards?userId=<id>&mode=all|weak&category=<optional>` gets flashcards
 - `POST /api/flashcards` updates spaced repetition progress (`easy|hard|forgot`)

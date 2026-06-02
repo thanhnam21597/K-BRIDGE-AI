@@ -1,5 +1,5 @@
 import { OpenAIEmbeddings } from "@langchain/openai";
-import { getSupabaseServerClient } from "@/lib/supabase";
+import { countDocumentsBySource, upsertDocumentRows } from "@/lib/db-store";
 import {
   getKbCategoryFromTags,
   KOREAN_VIETNAMESE_WORKPLACE_KB,
@@ -43,11 +43,10 @@ function getEmbeddingModel() {
 }
 
 /**
- * Seed the Korean-Vietnamese workplace KB into Supabase documents table.
+ * Seed the Korean-Vietnamese workplace KB into Postgres documents table.
  * Upsert is keyed by (user_id, file_name), so re-run safely updates embeddings/content.
  */
 export async function seedKoreanVietnameseKnowledgeBase(): Promise<SeedResult> {
-  const supabase = getSupabaseServerClient();
   const embeddingModel = getEmbeddingModel();
 
   const payloads = KOREAN_VIETNAMESE_WORKPLACE_KB.map((entry) => ({
@@ -72,32 +71,17 @@ export async function seedKoreanVietnameseKnowledgeBase(): Promise<SeedResult> {
     metadata: item.metadata,
   }));
 
-  const { error } = await supabase
-    .from("documents")
-    .upsert(rows, { onConflict: "user_id,file_name" });
-
-  if (error) {
-    throw new Error(`KB seeding failed: ${error.message}`);
-  }
+  await upsertDocumentRows(rows);
 
   return { seeded: rows.length, source: KB_SOURCE };
 }
 
 export async function getGlobalKbStatus(): Promise<GlobalKbStatus> {
-  const supabase = getSupabaseServerClient();
-  const { count, error } = await supabase
-    .from("documents")
-    .select("id", { count: "exact", head: true })
-    .eq("user_id", GLOBAL_KB_USER_ID)
-    .contains("metadata", { source: KB_SOURCE });
-
-  if (error) {
-    throw new Error(`Unable to read global KB status: ${error.message}`);
-  }
+  const count = await countDocumentsBySource(GLOBAL_KB_USER_ID, KB_SOURCE);
 
   return {
-    seeded: Boolean(count && count > 0),
-    count: count ?? 0,
+    seeded: count > 0,
+    count,
     source: KB_SOURCE,
   };
 }
